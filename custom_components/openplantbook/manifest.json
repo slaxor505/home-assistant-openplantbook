@@ -2,7 +2,6 @@
   "domain": "openplantbook",
   "name": "OpenPlantbook",
   "codeowners": [
-    "@Olen",
     "@slaxor505"
   ],
   "config_flow": true,
@@ -10,9 +9,9 @@
     "history",
     "recorder"
   ],
-  "documentation": "https://github.com/Olen/home-assistant-openplantbook/",
+  "documentation": "https://github.com/slaxor505/home-assistant-openplantbook/",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/Olen/home-assistant-openplantbook/issues",
+  "issue_tracker": "https://github.com/slaxor505/home-assistant-openplantbook/issues",
   "loggers": [
     "openplantbook_sdk"
   ],
@@ -20,5 +19,5 @@
     "json-timeseries==0.1.7",
     "openplantbook-sdk==0.6.1"
   ],
-  "version": "1.4.0-beta4"
+  "version": "1.4.0-beta5"
 }

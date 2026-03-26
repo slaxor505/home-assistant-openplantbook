@@ -157,7 +157,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "common plant names ([more info)](https://github.com/slaxor505/OpenPlantbook-client/wiki/Plant-Common-names), "
             "and (2) Plant-sensors problems detection with notifications. You can enable "
             "these in [settings]("
-            "https://github.com/Olen/home-assistant-openplantbook#%EF%B8%8F-configuration-options).",
+            "https://github.com/slaxor505/home-assistant-openplantbook#%EF%B8%8F-configuration-options).",
         )
 
     async def get_plant(call: ServiceCall) -> ServiceResponse:

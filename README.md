@@ -1,9 +1,11 @@
-# 🌿 OpenPlantbook Integration for Home Assistant
+# 🌿 OpenPlantbook Integration for Home Assistant - Founder - Edition
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/v/release/Olen/home-assistant-openplantbook?style=for-the-badge)](https://github.com/Olen/home-assistant-openplantbook/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/slaxor505/home-assistant-openplantbook?style=for-the-badge)](https://github.com/slaxor505/home-assistant-openplantbook/releases)
 
-Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) for searching plant species, fetching care data, and uploading sensor readings. Used as the data backend for the [Plant Monitor](https://github.com/Olen/homeassistant-plant) integration.
+Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) for searching plant species, fetching care data, and uploading sensor readings. Used as the data backend for the [Plant Monitor](https://github.com/slaxor505/homeassistant-plant) integration.
+
+This is fork of original [OpenPlantbook](https://github.com/PlantMonitor/home-assistant-openplantbook) integration that reflects the Open Plantbook founder's vision and adds new features.
 
 ---
 
@@ -20,8 +22,6 @@ Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) f
     - [🌐 International Common Names](#-international-common-names)
     - [🖼️ Automatically Download Images](#️-automatically-download-images)
   - [📡 Actions (Service Calls)](#-actions-service-calls)
-  - [🖥️ GUI Example](#️-gui-example)
-  - [☕ Support](#-support)
 
 ---
 
@@ -201,28 +201,3 @@ action: openplantbook.upload
 ```
 
 Returns `null` if nothing was uploaded or an error occurred. Check the HA log for details.
-
----
-
-## 🖥️ GUI Example
-
-An example of using the actions to build a plant search UI in Home Assistant:
-
-![OpenPlantbook GUI](images/openplantbook.gif)
-
-> [!NOTE]
-> This UI is **not** part of the integration — it's an example of what you can build with the actions.
-
-For a full walkthrough with helpers, automations, and Lovelace cards, see **[examples/GUI.md](examples/GUI.md)**.
-
----
-
-## ☕ Support
-
-* Olen's work by 
-<a href="https://www.buymeacoffee.com/olatho" target="_blank">
-<img src="https://user-images.githubusercontent.com/203184/184674974-db7b9e53-8c5a-40a0-bf71-c01311b36b0a.png" style="height: 50px !important;">
-</a>
-
-* Open Plantbook by adding a new plant to its data base and sharing your sensors data.
-
