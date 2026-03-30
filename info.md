@@ -1,4 +1,4 @@
-# 🌿 OpenPlantbook
+# 🌿 OpenPlantbook (Founder-Edition)
 
 Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) — search plant species, fetch care data, and upload sensor readings.
 

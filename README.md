@@ -1,12 +1,12 @@
-# 🌿 OpenPlantbook Integration for Home Assistant - Founder - Edition
+# 🌿 Founder-Edition of OpenPlantbook Integration for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/v/release/slaxor505/home-assistant-openplantbook?style=for-the-badge)](https://github.com/slaxor505/home-assistant-openplantbook/releases)
 
 Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) for searching plant species, fetching care data, and uploading sensor readings. Used as the data backend for the [Plant Monitor](https://github.com/slaxor505/homeassistant-plant) integration.
 
-This is fork of original [OpenPlantbook](https://github.com/PlantMonitor/home-assistant-openplantbook) integration that reflects the Open Plantbook founder's vision and adds new features.
-
+This is fork of original [OpenPlantbook](https://github.com/PlantMonitor/home-assistant-openplantbook) integration that reflects the [Open Plantbook founder](https://plantbook.io/about-us/)'s vision and adds extra features. 
+The goal of this fork is to stay aligned with Open Plantbook features, keep things simple to use, and remain compatible with Home Assistant, including the custom plant integration.
 ---
 
 ## 📑 Table of Contents
@@ -25,9 +25,13 @@ This is fork of original [OpenPlantbook](https://github.com/PlantMonitor/home-as
 
 ---
 
-## 🆕 What's New in version 1.4
+## 🆕 What's New in version 1.5
 
 - **Sensor monitoring warnings** — Stale or missing sensor updates are flagged during upload runs; details and optional notifications in [🔔 Sensors Monitoring](#-sensors-monitoring).
+- **Image downloading supports cache busting** — Image filenames are now derived from the URL path only, ignoring query parameters (e.g. `?v=...`).
+- 
+## 🆕 What's New in version 1.4
+
 - **International common names** — OpenPlantbook can return common names in your Home Assistant language. See [🌐 International Common Names](#-international-common-names).
 
 ---
