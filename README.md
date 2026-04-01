@@ -7,6 +7,7 @@ Connects Home Assistant to the [OpenPlantbook API](https://open.plantbook.io/) f
 
 This is fork of original [OpenPlantbook](https://github.com/PlantMonitor/home-assistant-openplantbook) integration that reflects the [Open Plantbook founder](https://plantbook.io/about-us/)'s vision and adds extra features. 
 The goal of this fork is to stay aligned with Open Plantbook features, keep things simple to use, and remain compatible with Home Assistant, including the custom plant integration.
+
 ---
 
 ## 📑 Table of Contents
