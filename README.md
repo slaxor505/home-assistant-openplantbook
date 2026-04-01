@@ -29,7 +29,7 @@ The goal of this fork is to stay aligned with Open Plantbook features, keep thin
 
 - **Sensor monitoring warnings** — Stale or missing sensor updates are flagged during upload runs; details and optional notifications in [🔔 Sensors Monitoring](#-sensors-monitoring).
 - **Image downloading supports cache busting** — Image filenames are now derived from the URL path only, ignoring query parameters (e.g. `?v=...`).
-- 
+
 ## 🆕 What's New in version 1.4
 
 - **International common names** — OpenPlantbook can return common names in your Home Assistant language. See [🌐 International Common Names](#-international-common-names).
