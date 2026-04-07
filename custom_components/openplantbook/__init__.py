@@ -205,7 +205,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     ATTR_IMAGE
                 ):
                     filename = slugify(
-                        urllib.parse.unquote(os.path.basename(plant_data[ATTR_IMAGE])),
+                        urllib.parse.unquote(
+                            os.path.basename(
+                                urllib.parse.urlparse(plant_data[ATTR_IMAGE]).path
+                            )
+                        ),
                         separator=" ",
                     ).replace(" jpg", ".jpg")
                     raise_if_invalid_filename(filename)
