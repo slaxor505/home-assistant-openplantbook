@@ -20,14 +20,22 @@ from .const import (
     DOMAIN,
     FLOW_DOWNLOAD_IMAGES,
     FLOW_DOWNLOAD_PATH,
+    FLOW_NOTIFY_WARNINGS,
     FLOW_SEND_LANG,
     FLOW_UPLOAD_DATA,
     FLOW_UPLOAD_HASS_LOCATION_COORD,
     FLOW_UPLOAD_HASS_LOCATION_COUNTRY,
+    OPB_CURRENT_INFO_MESSAGE,
+    OPB_INFO_MESSAGE,
     PLANTBOOK_BASEURL,
 )
 
 TITLE = "title"
+DESCRIPTION_PLACEHOLDERS = {
+    "sensor_data_url": "https://open.plantbook.io/ui/sensor-data/",
+    "common_names_url": "https://github.com/slaxor505/OpenPlantbook-client/wiki/Plant-Common-names",
+    "apikey_url": "https://open.plantbook.io/apikey/show/",
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +45,7 @@ UPLOAD_SCHEMA = vol.Schema(
         FLOW_UPLOAD_DATA: bool,
         FLOW_UPLOAD_HASS_LOCATION_COUNTRY: bool,
         FLOW_UPLOAD_HASS_LOCATION_COORD: bool,
+        vol.Optional(FLOW_NOTIFY_WARNINGS, default=False): bool,
         vol.Optional(FLOW_SEND_LANG, default=True): bool,
     }
 )
@@ -103,6 +112,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 # Input is valid, set data.
                 self.data = user_input
+                # Skip upgrade message for new installations
+                self.data[OPB_INFO_MESSAGE] = OPB_CURRENT_INFO_MESSAGE
                 # Return the form of the next step.
                 return await self.async_step_upload()
 
@@ -110,9 +121,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=DATA_SCHEMA,
             errors=errors,
-            description_placeholders={
-                "apikey_url": "https://open.plantbook.io/apikey/show/"
-            },
+            description_placeholders=DESCRIPTION_PLACEHOLDERS,
         )
 
     async def async_step_upload(
@@ -124,6 +133,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         errors: dict[str, str] = {}
         if user_input is not None:
+            if user_input.get(FLOW_NOTIFY_WARNINGS) and not user_input.get(
+                FLOW_UPLOAD_DATA
+            ):
+                errors[FLOW_NOTIFY_WARNINGS] = "notify_requires_upload"
+                return self.async_show_form(
+                    step_id="upload", data_schema=UPLOAD_SCHEMA, errors=errors
+                )
             return self.async_create_entry(
                 title="Openplantbook API", data=self.data, options=user_input
             )
@@ -132,10 +148,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="upload",
             data_schema=UPLOAD_SCHEMA,
             errors=errors,
-            description_placeholders={
-                "sensor_data_url": "https://open.plantbook.io/ui/sensor-data/",
-                "common_names_url": "https://github.com/slaxor505/OpenPlantbook-client/wiki/Plant-Common-names",
-            },
+            description_placeholders=DESCRIPTION_PLACEHOLDERS,
         )
 
 
@@ -157,6 +170,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
         # Uploader settings
         upload_sensors = self.config_entry.options.get(FLOW_UPLOAD_DATA, False)
+        notify_warnings = self.config_entry.options.get(FLOW_NOTIFY_WARNINGS, False)
         location_country = self.config_entry.options.get(
             FLOW_UPLOAD_HASS_LOCATION_COUNTRY, False
         )
@@ -177,6 +191,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             location_country = user_input.get(FLOW_UPLOAD_HASS_LOCATION_COUNTRY)
             location_coordinates = user_input.get(FLOW_UPLOAD_HASS_LOCATION_COORD)
             use_lang = user_input.get(FLOW_SEND_LANG)
+            notify_warnings = user_input.get(FLOW_NOTIFY_WARNINGS)
 
         _LOGGER.debug(
             "Init: %s, %s", self.config_entry.entry_id, self.config_entry.options
@@ -184,6 +199,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         data_schema = {
             vol.Optional(FLOW_UPLOAD_DATA, default=upload_sensors): cv.boolean,
+            vol.Optional(FLOW_NOTIFY_WARNINGS, default=notify_warnings): cv.boolean,
             vol.Optional(
                 FLOW_UPLOAD_HASS_LOCATION_COUNTRY, default=location_country
             ): cv.boolean,
@@ -199,14 +215,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(data_schema),
             errors=self.errors,
-            description_placeholders={
-                "sensor_data_url": "https://open.plantbook.io/ui/sensor-data/",
-                "common_names_url": "https://github.com/slaxor505/OpenPlantbook-client/wiki/Plant-Common-names",
-            },
+            description_placeholders=DESCRIPTION_PLACEHOLDERS,
         )
 
     async def validate_input(self, user_input: dict) -> bool:
         """Validate user input."""
+        if user_input.get(FLOW_NOTIFY_WARNINGS) and not user_input.get(
+            FLOW_UPLOAD_DATA
+        ):
+            self.errors[FLOW_NOTIFY_WARNINGS] = "notify_requires_upload"
+            return False
         # If we dont want to download, dont worry about the path
         if not user_input.get(FLOW_DOWNLOAD_IMAGES):
             return True
