@@ -10,6 +10,9 @@ from datetime import datetime, timedelta
 
 import voluptuous as vol
 from homeassistant import exceptions
+from homeassistant.components.persistent_notification import (
+    create as create_notification,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_CLIENT_ID, CONF_CLIENT_SECRET
 from homeassistant.core import (
@@ -41,7 +44,9 @@ from .const import (
     OPB_ATTR_RESULTS,
     OPB_ATTR_SEARCH_RESULT,
     OPB_ATTR_TIMESTAMP,
+    OPB_CURRENT_INFO_MESSAGE,
     OPB_DISPLAY_PID,
+    OPB_INFO_MESSAGE,
     OPB_MAX_DLI,
     OPB_MAX_LIGHT_LUX,
     OPB_MAX_LIGHT_MMOL,
@@ -134,6 +139,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if ATTR_SPECIES not in hass.data[DOMAIN]:
         hass.data[DOMAIN][ATTR_SPECIES] = {}
 
+    # Display one-off notification about new functionality after upgrade
+    if (
+        entry.data.get(OPB_INFO_MESSAGE)
+        and entry.data.get(OPB_INFO_MESSAGE) != OPB_CURRENT_INFO_MESSAGE
+    ):
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, OPB_INFO_MESSAGE: OPB_CURRENT_INFO_MESSAGE}
+        )
+        _LOGGER.debug(
+            "Trigger after upgrade notification: %s", OPB_CURRENT_INFO_MESSAGE
+        )
+        create_notification(
+            hass=hass,
+            title="New Features available in OpenPlantbook Integration",
+            message="New features are available: (1) use Home Assistant language to fetch internationalised "
+            "common plant names ([more info)](https://github.com/slaxor505/OpenPlantbook-client/wiki/Plant-Common-names), "
+            "and (2) Plant-sensors problems detection with notifications. You can enable "
+            "these in [settings]("
+            "https://github.com/Olen/home-assistant-openplantbook#%EF%B8%8F-configuration-options).",
+        )
+
     async def get_plant(call: ServiceCall) -> ServiceResponse:
         if DOMAIN not in hass.data:
             _LOGGER.error("no data found for domain %s", DOMAIN)
@@ -156,6 +182,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 # Optionally pass Home Assistant language to OpenPlantbook API
                 send_lang = entry.options.get(FLOW_SEND_LANG, True)
                 if send_lang:
+                    # Determine language to use for OpenPlantbook API (ISO 639-1)
                     lang_code = hass.config.language or "en"
                     if isinstance(lang_code, str):
                         lang_code = lang_code.split("-")[0].lower()
