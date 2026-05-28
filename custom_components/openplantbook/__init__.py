@@ -306,7 +306,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
 
             wait = 0
-            while cache_key not in hass.data[DOMAIN][ATTR_SPECIES] or OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][cache_key]:
+            while (
+                cache_key not in hass.data[DOMAIN][ATTR_SPECIES]
+                or OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            ):
                 _LOGGER.debug("Waiting")
                 wait += 1
                 if wait == 10:
@@ -400,10 +403,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     pid_still_valid = any(
                         other_key != cache_key
                         and OPB_ATTR_TIMESTAMP in other_value
-                        and datetime.now() <= datetime.fromisoformat(
-                            other_value[OPB_ATTR_TIMESTAMP]
-                        ) + timedelta(hours=hours)
-                        for other_key, other_value in hass.data[DOMAIN][ATTR_SPECIES].items()
+                        and datetime.now()
+                        <= datetime.fromisoformat(other_value[OPB_ATTR_TIMESTAMP])
+                        + timedelta(hours=hours)
+                        for other_key, other_value in hass.data[DOMAIN][
+                            ATTR_SPECIES
+                        ].items()
                     )
                     if not pid_still_valid:
                         hass.states.async_remove(entity_id)

@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.5.1] — 2026-05-28
+
+### Added
+
+- **Extra data categories in `get`**: `openplantbook.get` service now accepts an `include` parameter to request extra
+  data categories (e.g., `care`) from the API.
+- **Smarter caching for extra data**: cache keys now include the `include` parameter, so different include variants are
+  cached independently.
+- **AGENTS.md**: new guidance file for AI agents working in this repository.
+
+### Changed
+
+- **Cache key structure**: cache now stores data keyed by `(species, include)` tuples instead of species strings,
+  enabling independent caching of different include variants.
+- **Cache cleanup logic**: `clean_cache` service now checks all cache entries for expiration and only removes entities
+  when no valid cache entry remains for that species.
+- **Error handling cleanup**: removed redundant `del` statements for cache cleanup on errors; added a `finally` block to
+  ensure sentinel entries are removed.
+- **Upload validator**: switched from `isinstance(supported_unit, (list, tuple, set))` to
+  `isinstance(supported_unit, list | tuple | set)` for consistency.
+- **Tests**: added comprehensive tests for cache key function, include parameter isolation, cache bypass behavior, and
+  API parameter passing; updated existing tests to use `_cache_key` helper.
+
 ## [1.5.0] — 2026-05-27
 
 ### Added
