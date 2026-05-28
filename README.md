@@ -26,6 +26,13 @@ The goal of this fork is to stay aligned with Open Plantbook features, keep thin
 
 ---
 
+## 🆕 What's New in version 1.5.1
+
+- **Extra data categories in `get`** — The `openplantbook.get` service now supports an `include` parameter to request extra data categories like `care` from the API. See [openplantbook.get](#openplantbookget).
+- **Smarter caching for extra data** — When you request extra data (like `care`) for a plant, those results are cached
+  separately. This means fetching the same plant with different `include` options won't overwrite each other, and each
+  variant stays fresh in the cache.
+
 ## 🆕 What's New in version 1.5
 
 - **Sensor monitoring warnings** — Stale or missing sensor updates are flagged during upload runs; details and optional notifications in [🔔 Sensors Monitoring](#-sensors-monitoring).
@@ -182,12 +189,21 @@ Get detailed data for a single species:
 action: openplantbook.get
 data:
   species: capsicum annuum
+  include: care
 ```
 
 > [!NOTE]
 > The species string must match exactly the `pid` returned by `openplantbook.search`.
 
-Read results from `openplantbook.capsicum_annuum`:
+**Parameters:**
+
+| Parameter | Required | Default | Description                                                                                                                                                                                                                                                  |
+|-----------|----------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `species` | yes | — | Exact `pid` of the species                                                                                                                                                                                                                                   |
+| `include` | no | — | Comma-separated extra data categories (e.g., `care`). If omitted, extra categories are not included. See [API docs](https://open.plantbook.io/api/v1/plant/detail/acer%20pseudoplatanus/?include=*) for supported categories |
+| `cache`   | no | `true` | Set to `false` to bypass the cache and fetch fresh data from the API. **Cache entries are keyed by `species` + `include`**, so the same species with different `include` values are cached independently. Bypassing clears only the matching variant. |
+
+The result is stored as a Home Assistant state entity. Read it in Jinja templates:
 
 ```jinja2
 Details for plant {{ states('openplantbook.capsicum_annuum') }}

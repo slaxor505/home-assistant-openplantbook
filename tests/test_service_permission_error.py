@@ -4,7 +4,7 @@ import pytest
 from homeassistant.const import CONF_CLIENT_ID, CONF_CLIENT_SECRET
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.openplantbook import InvalidAuth, async_setup_entry
+from custom_components.openplantbook import InvalidAuth, async_setup_entry, _cache_key
 from custom_components.openplantbook.const import (
     ATTR_IMAGE,
     ATTR_SPECIES,
@@ -41,7 +41,7 @@ async def test_get_service_handles_permission_error_from_api(hass):
             blocking=True,
         )
 
-    assert "capsicum annuum" not in hass.data[DOMAIN][ATTR_SPECIES]
+    assert _cache_key("capsicum annuum", None) not in hass.data[DOMAIN][ATTR_SPECIES]
 
 
 @pytest.mark.asyncio

@@ -50,7 +50,7 @@ def get_supported_state_value(state) -> tuple:
     def validate_measurement(supported_unit, value_range):
         nonlocal state_error
 
-        if isinstance(supported_unit, (list, tuple, set)):
+        if isinstance(supported_unit, list | tuple | set):
             unit_supported = unit_of_measurement in supported_unit
         else:
             unit_supported = unit_of_measurement == supported_unit
