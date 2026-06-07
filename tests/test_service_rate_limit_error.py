@@ -6,7 +6,7 @@ from homeassistant.exceptions import HomeAssistantError
 from openplantbook_sdk.sdk import RateLimitError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.openplantbook import _cache_key, async_setup_entry
+from custom_components.openplantbook import async_setup_entry
 from custom_components.openplantbook.const import (
     ATTR_ALIAS,
     ATTR_SPECIES,
@@ -39,7 +39,7 @@ async def test_get_service_handles_rate_limit_error(hass):
             blocking=True,
         )
 
-    assert _cache_key("capsicum annuum", None) not in hass.data[DOMAIN][ATTR_SPECIES]
+    assert "capsicum annuum" not in hass.data[DOMAIN][ATTR_SPECIES]
 
 
 @pytest.mark.asyncio

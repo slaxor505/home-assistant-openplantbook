@@ -25,6 +25,38 @@ from custom_components.openplantbook.const import (
 from custom_components.openplantbook.plantbook_exception import OpenPlantbookException
 
 
+def _make_detail_side_effect():
+    """Build an async_plant_detail_get side_effect that adds care fields
+    only when params requests include=care (mirrors the real API)."""
+
+    async def _side_effect(species, lang=None, params=None, **kwargs):
+        data = {
+            "pid": "monstera deliciosa",
+            "display_pid": "Monstera deliciosa",
+            "alias": "Swiss cheese plant",
+            "image_url": "https://example.com/monstera.jpg",
+            "min_temp": 15,
+            "max_temp": 30,
+            "min_soil_moist": 20,
+            "max_soil_moist": 60,
+        }
+        include = (params or {}).get("include", "")
+        categories = {c.strip() for c in include.split(",") if c.strip()}
+        if "care" in categories:
+            data.update(
+                {
+                    "watering": "Likes wet envs; reduce watering in winter.",
+                    "sunlight": "Relatively shade-tolerant, prefers half-shade.",
+                    "soil": "Peat mixed with coarse sand or hydroponics",
+                    "pruning": "Timely remove dead and yellowish leaves.",
+                    "fertilization": "Dilute fertilizer once every 15 days.",
+                }
+            )
+        return data
+
+    return _side_effect
+
+
 class TestIntegrationSetup:
     """Tests for integration setup."""
 
@@ -175,10 +207,8 @@ class TestGetPlantService:
             blocking=True,
         )
 
-        from custom_components.openplantbook import _cache_key
-
-        cache_key = _cache_key("monstera deliciosa", None)
-        assert cache_key in hass.data[DOMAIN][ATTR_SPECIES]
+        # Verify it's cached
+        assert "monstera deliciosa" in hass.data[DOMAIN][ATTR_SPECIES]
 
         # Second call should use cache
         mock_openplantbook_api.async_plant_detail_get.reset_mock()
@@ -192,33 +222,42 @@ class TestGetPlantService:
         # API should not be called again (using cache)
         # Note: This depends on cache time, in practice it should use cache
 
-    async def test_cache_key_function(self) -> None:
-        """Test _cache_key builds correct composite keys."""
-        from custom_components.openplantbook import _cache_key
 
-        assert _cache_key("monstera", None) == ("monstera", None)
-        assert _cache_key("monstera", "") == ("monstera", None)
-        assert _cache_key("monstera", "care") == ("monstera", "care")
-        assert _cache_key("monstera", "care,poison") == ("monstera", "care,poison")
+class TestParseIncludes:
+    """Tests for the _parse_includes helper (upstream v1.5.0)."""
 
-    async def test_different_include_values_cache_separately(
+    def test_none_returns_empty_set(self) -> None:
+        from custom_components.openplantbook import _parse_includes
+
+        assert _parse_includes(None) == set()
+
+    def test_empty_string_returns_empty_set(self) -> None:
+        from custom_components.openplantbook import _parse_includes
+
+        assert _parse_includes("") == set()
+        assert _parse_includes(" ") == set()
+
+    def test_single_category(self) -> None:
+        from custom_components.openplantbook import _parse_includes
+
+        assert _parse_includes("care") == {"care"}
+
+    def test_comma_separated_with_whitespace(self) -> None:
+        from custom_components.openplantbook import _parse_includes
+
+        assert _parse_includes("care, poison ,care") == {"care", "poison"}
+
+
+class TestGetServiceInclude:
+    """Tests for the include parameter on the get service (upstream v1.5.0)."""
+
+    async def test_include_param_passed_to_api(
         self,
         hass: HomeAssistant,
         init_integration: MockConfigEntry,
         mock_openplantbook_api: MagicMock,
     ) -> None:
-        """Test that different 'include' values create separate cache entries."""
-        from custom_components.openplantbook import _cache_key
-
-        # Fetch without include
-        await hass.services.async_call(
-            DOMAIN,
-            OPB_SERVICE_GET,
-            {"species": "monstera deliciosa"},
-            blocking=True,
-        )
-
-        # Fetch with include="care"
+        """include=care must reach the SDK as a params query argument."""
         await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
@@ -226,22 +265,72 @@ class TestGetPlantService:
             blocking=True,
         )
 
-        # Both cache entries should exist independently
-        species_cache = hass.data[DOMAIN][ATTR_SPECIES]
-        assert _cache_key("monstera deliciosa", None) in species_cache
-        assert _cache_key("monstera deliciosa", "care") in species_cache
+        call = mock_openplantbook_api.async_plant_detail_get.call_args
+        assert call.kwargs["params"] == {"include": "care"}
 
-        # API should have been called twice (once per unique variant)
+    async def test_no_include_passes_empty_params(
+        self,
+        hass: HomeAssistant,
+        init_integration: MockConfigEntry,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """A plain get passes an empty params dict (no extra query args)."""
+        await hass.services.async_call(
+            DOMAIN,
+            OPB_SERVICE_GET,
+            {"species": "monstera deliciosa"},
+            blocking=True,
+        )
+
+        call = mock_openplantbook_api.async_plant_detail_get.call_args
+        assert call.kwargs["params"] == {}
+
+
+class TestGetServiceIncludeCaching:
+    """Tests for include-aware caching (upstream v1.5.0)."""
+
+    async def test_base_then_care_refetches(
+        self,
+        hass: HomeAssistant,
+        init_integration: MockConfigEntry,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """A base fetch followed by include=care must hit the API again."""
+        mock_openplantbook_api.async_plant_detail_get = AsyncMock(
+            side_effect=_make_detail_side_effect()
+        )
+
+        await hass.services.async_call(
+            DOMAIN, OPB_SERVICE_GET, {"species": "monstera deliciosa"}, blocking=True
+        )
+        result = await hass.services.async_call(
+            DOMAIN,
+            OPB_SERVICE_GET,
+            {"species": "monstera deliciosa", "include": "care"},
+            blocking=True,
+            return_response=True,
+        )
+
         assert mock_openplantbook_api.async_plant_detail_get.call_count == 2
+        assert result.get("watering") == "Likes wet envs; reduce watering in winter."
 
-    async def test_cached_variant_served_for_matching_include(
+    async def test_care_then_care_served_from_cache(
         self,
         hass: HomeAssistant,
         init_integration: MockConfigEntry,
         mock_openplantbook_api: MagicMock,
     ) -> None:
-        """Test that a cached variant is returned when the same include is requested again."""
-        # First call with include="care"
+        """A second identical include=care request is served from cache."""
+        mock_openplantbook_api.async_plant_detail_get = AsyncMock(
+            side_effect=_make_detail_side_effect()
+        )
+
+        await hass.services.async_call(
+            DOMAIN,
+            OPB_SERVICE_GET,
+            {"species": "monstera deliciosa", "include": "care"},
+            blocking=True,
+        )
         await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
@@ -249,76 +338,47 @@ class TestGetPlantService:
             blocking=True,
         )
 
-        # Reset mock to track subsequent calls
-        mock_openplantbook_api.async_plant_detail_get.reset_mock()
+        assert mock_openplantbook_api.async_plant_detail_get.call_count == 1
 
-        # Second call with same include="care" should use cache
+    async def test_base_after_care_uses_cache_and_keeps_care(
+        self,
+        hass: HomeAssistant,
+        init_integration: MockConfigEntry,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """A base get after a fresh care fetch is a cache hit and still has care."""
+        mock_openplantbook_api.async_plant_detail_get = AsyncMock(
+            side_effect=_make_detail_side_effect()
+        )
+
+        await hass.services.async_call(
+            DOMAIN,
+            OPB_SERVICE_GET,
+            {"species": "monstera deliciosa", "include": "care"},
+            blocking=True,
+        )
         result = await hass.services.async_call(
-            DOMAIN,
-            OPB_SERVICE_GET,
-            {"species": "monstera deliciosa", "include": "care"},
-            blocking=True,
-            return_response=True,
-        )
-
-        # Should return data and NOT call the API again
-        assert result is not None
-        assert result.get("pid") == "monstera deliciosa"
-        mock_openplantbook_api.async_plant_detail_get.assert_not_called()
-
-    async def test_cache_without_include_isolated_from_with_include(
-        self,
-        hass: HomeAssistant,
-        init_integration: MockConfigEntry,
-        mock_openplantbook_api: MagicMock,
-    ) -> None:
-        """Test that a cached entry without 'include' does not prevent fetching with 'include'.
-
-        This is the core bug fix: previously, fetching without 'include' would cache data
-        that was then incorrectly returned for a subsequent request with 'include'.
-        """
-        # First, fetch without include (this populates the no-include cache variant)
-        await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
             {"species": "monstera deliciosa"},
             blocking=True,
-        )
-
-        # Reset mock so we can verify the API IS called for the include variant
-        mock_openplantbook_api.async_plant_detail_get.reset_mock()
-
-        # Now fetch WITH include - should hit the API (not reuse no-include cache)
-        result = await hass.services.async_call(
-            DOMAIN,
-            OPB_SERVICE_GET,
-            {"species": "monstera deliciosa", "include": "care"},
-            blocking=True,
             return_response=True,
         )
 
-        assert result is not None
-        # API should have been called because the include variant wasn't cached yet
-        mock_openplantbook_api.async_plant_detail_get.assert_called_once()
-        call_kwargs = mock_openplantbook_api.async_plant_detail_get.call_args.kwargs
-        assert call_kwargs["params"]["include"] == "care"
+        assert mock_openplantbook_api.async_plant_detail_get.call_count == 1
+        assert result.get("soil") == "Peat mixed with coarse sand or hydroponics"
 
-    async def test_cache_bypass_clears_only_specific_variant(
+    async def test_care_fields_published_as_entity_attributes(
         self,
         hass: HomeAssistant,
         init_integration: MockConfigEntry,
         mock_openplantbook_api: MagicMock,
     ) -> None:
-        """Test that cache bypass only clears the specific include variant."""
-        from custom_components.openplantbook import _cache_key
-
-        # Populate both cache variants
-        await hass.services.async_call(
-            DOMAIN,
-            OPB_SERVICE_GET,
-            {"species": "monstera deliciosa"},
-            blocking=True,
+        """care fields are merged into the HA entity attributes."""
+        mock_openplantbook_api.async_plant_detail_get = AsyncMock(
+            side_effect=_make_detail_side_effect()
         )
+
         await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
@@ -326,13 +386,27 @@ class TestGetPlantService:
             blocking=True,
         )
 
-        species_cache = hass.data[DOMAIN][ATTR_SPECIES]
-        key_no_include = _cache_key("monstera deliciosa", None)
-        key_care = _cache_key("monstera deliciosa", "care")
-        assert key_no_include in species_cache
-        assert key_care in species_cache
+        state = hass.states.get("openplantbook.monstera_deliciosa")
+        assert state is not None
+        assert state.attributes.get("watering") is not None
 
-        # Bypass cache only for the include="care" variant
+    async def test_cache_bypass_with_include(
+        self,
+        hass: HomeAssistant,
+        init_integration: MockConfigEntry,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """cache=false forces a refetch even for an already-satisfied include."""
+        mock_openplantbook_api.async_plant_detail_get = AsyncMock(
+            side_effect=_make_detail_side_effect()
+        )
+
+        await hass.services.async_call(
+            DOMAIN,
+            OPB_SERVICE_GET,
+            {"species": "monstera deliciosa", "include": "care"},
+            blocking=True,
+        )
         await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
@@ -340,48 +414,24 @@ class TestGetPlantService:
             blocking=True,
         )
 
-        # The no-include variant should still be cached
-        assert key_no_include in species_cache
-        # The care variant should have been re-fetched (still present but fresh)
-        assert key_care in species_cache
+        assert mock_openplantbook_api.async_plant_detail_get.call_count == 2
 
-    async def test_get_plant_passes_include_param(
+    async def test_include_whitespace_normalized(
         self,
         hass: HomeAssistant,
         init_integration: MockConfigEntry,
         mock_openplantbook_api: MagicMock,
     ) -> None:
-        """Test get plant passes 'include' as a query param to the API."""
+        """Whitespace around include categories is stripped and sorted for the API."""
         await hass.services.async_call(
             DOMAIN,
             OPB_SERVICE_GET,
-            {"species": "monstera deliciosa", "include": "care"},
+            {"species": "monstera deliciosa", "include": " care , poison "},
             blocking=True,
         )
 
-        mock_openplantbook_api.async_plant_detail_get.assert_called_once()
-        call_kwargs = mock_openplantbook_api.async_plant_detail_get.call_args.kwargs
-        assert "params" in call_kwargs
-        assert call_kwargs["params"]["include"] == "care"
-
-    async def test_get_plant_no_include_param_when_not_provided(
-        self,
-        hass: HomeAssistant,
-        init_integration: MockConfigEntry,
-        mock_openplantbook_api: MagicMock,
-    ) -> None:
-        """Test get plant does not send 'include' param when not provided."""
-        await hass.services.async_call(
-            DOMAIN,
-            OPB_SERVICE_GET,
-            {"species": "monstera deliciosa"},
-            blocking=True,
-        )
-
-        call_kwargs = mock_openplantbook_api.async_plant_detail_get.call_args.kwargs
-        assert "params" not in call_kwargs or "include" not in call_kwargs.get(
-            "params", {}
-        )
+        call = mock_openplantbook_api.async_plant_detail_get.call_args
+        assert call.kwargs["params"] == {"include": "care,poison"}
 
 
 class TestCleanCacheService:
@@ -403,10 +453,7 @@ class TestCleanCacheService:
         )
 
         # Verify it's cached
-        from custom_components.openplantbook import _cache_key
-
-        cache_key = _cache_key("monstera deliciosa", None)
-        assert cache_key in hass.data[DOMAIN][ATTR_SPECIES]
+        assert "monstera deliciosa" in hass.data[DOMAIN][ATTR_SPECIES]
 
         # Clean cache with hours=0 to remove all
         await hass.services.async_call(
@@ -417,7 +464,7 @@ class TestCleanCacheService:
         )
 
         # Cache should be empty
-        assert cache_key not in hass.data[DOMAIN][ATTR_SPECIES]
+        assert "monstera deliciosa" not in hass.data[DOMAIN][ATTR_SPECIES]
 
 
 class TestSearchServiceErrors:
@@ -565,9 +612,7 @@ class TestCleanCacheServiceEdgeCases:
         )
 
         # With default hours (24), recent cache entries should remain
-        from custom_components.openplantbook import _cache_key
-
-        assert _cache_key("monstera deliciosa", None) in hass.data[DOMAIN][ATTR_SPECIES]
+        assert "monstera deliciosa" in hass.data[DOMAIN][ATTR_SPECIES]
 
     async def test_clean_cache_with_invalid_hours(
         self,
@@ -593,9 +638,7 @@ class TestCleanCacheServiceEdgeCases:
         )
 
         # With invalid hours, uses default (24), recent entries should remain
-        from custom_components.openplantbook import _cache_key
-
-        assert _cache_key("monstera deliciosa", None) in hass.data[DOMAIN][ATTR_SPECIES]
+        assert "monstera deliciosa" in hass.data[DOMAIN][ATTR_SPECIES]
 
 
 class TestImageDownload:

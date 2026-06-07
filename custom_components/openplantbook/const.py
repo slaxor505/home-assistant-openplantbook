@@ -5,6 +5,7 @@ PLANTBOOK_BASEURL = "https://open.plantbook.io/api/v1"
 ATTR_ALIAS = "alias"
 ATTR_PLANT_INSTANCE = "plant_instance"
 ATTR_SPECIES = "species"
+ATTR_INCLUDE = "include"
 ATTR_API = "api"
 ATTR_HOURS = "hours"
 ATTR_IMAGE = "image_url"
@@ -15,6 +16,9 @@ OPB_ATTR_SEARCH_RESULT = "search_result"
 OPB_ATTR_RESULT = "result"
 OPB_ATTR_RESULTS = "results"
 OPB_ATTR_TIMESTAMP = "timestamp"
+# Internal marker stored on a cached plant_data dict: the list of extra
+# `include` categories that the cached entry already satisfies (e.g. ["care"]).
+OPB_ATTR_INCLUDES = "_fetched_includes"
 
 OPB_SERVICE_SEARCH = "search"
 OPB_SERVICE_GET = "get"

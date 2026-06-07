@@ -32,6 +32,7 @@ from .const import (
     ATTR_API,
     ATTR_HOURS,
     ATTR_IMAGE,
+    ATTR_INCLUDE,
     ATTR_SPECIES,
     CACHE_TIME,
     DOMAIN,
@@ -41,6 +42,7 @@ from .const import (
     MMOL_LUX_RATIO_MAX,
     MMOL_LUX_RATIO_MIN,
     MMOL_TO_DLI_FACTOR,
+    OPB_ATTR_INCLUDES,
     OPB_ATTR_RESULTS,
     OPB_ATTR_SEARCH_RESULT,
     OPB_ATTR_TIMESTAMP,
@@ -69,9 +71,17 @@ CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 _LOGGER = logging.getLogger(__name__)
 
 
-def _cache_key(species: str, include: str | None) -> tuple:
-    """Build a cache key from species and optional include parameter."""
-    return (species, include or None)
+def _parse_includes(include: str | None) -> set[str]:
+    """Parse the comma-separated `include` service parameter into a set.
+
+    Empty/whitespace-only input yields an empty set, which is a subset of any
+    cached entry's satisfied categories — so a plain `get` never triggers an
+    include-driven refetch of an already-cached entry (a first fetch or normal
+    cache expiry still calls the API).
+    """
+    if not include:
+        return set()
+    return {part.strip() for part in include.split(",") if part.strip()}
 
 
 def _enrich_plant_data_with_dli(plant_data: dict) -> None:
@@ -175,35 +185,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "invalid service call, required attribute %s missing", ATTR_SPECIES
             )
 
-        # Build a cache key that accounts for the 'include' parameter,
-        # since different include values return different payloads.
-        include = call.data.get("include")
-        cache_key = _cache_key(species, include)
+        # Parse the optional `include` parameter (comma-separated extra data
+        # categories, e.g. "care"). An empty request is satisfied by any entry.
+        requested_includes = _parse_includes(call.data.get(ATTR_INCLUDE))
 
-        # Allow callers to bypass the cache (e.g. plant integration "Force refresh")
+        # Decide whether to drop a cached entry and refetch. We refetch when the
+        # caller bypasses the cache (cache: false) or when a cached entry does
+        # not already contain all the requested include categories. In both
+        # cases we require a *completed* entry (OPB_PID present), so we never
+        # delete the in-flight sentinel ({}) used by the concurrency guard
+        # below — a concurrent request waits for that fetch instead of starting
+        # a duplicate one.
         use_cache = call.data.get("cache", True)
-        if not use_cache and cache_key in hass.data[DOMAIN][ATTR_SPECIES]:
+        cached = hass.data[DOMAIN][ATTR_SPECIES].get(species)
+        includes_unsatisfied = not requested_includes.issubset(
+            set((cached or {}).get(OPB_ATTR_INCLUDES, []))
+        )
+        if (
+            cached is not None
+            and OPB_PID in cached
+            and (not use_cache or includes_unsatisfied)
+        ):
             _LOGGER.debug(
-                "Cache bypass requested for %s (include=%s), clearing cached data",
+                "Refetching %s (bypass=%s, include=%s), clearing cached data",
                 species,
-                include,
+                not use_cache,
+                sorted(requested_includes),
             )
-            del hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            del hass.data[DOMAIN][ATTR_SPECIES][species]
 
-        # Here we try to ensure that we only run one API request for each
-        # species+include combination. The first process creates an empty dict
-        # and accesses the API. Later requests for the same key either wait
-        # for the first one to complete or return immediately if cached.
-        _LOGGER.debug("get_plant %s (include=%s)", species, include)
-        if cache_key not in hass.data[DOMAIN][ATTR_SPECIES]:
-            _LOGGER.debug(
-                "I am the first process to get %s (include=%s)", species, include
-            )
-            hass.data[DOMAIN][ATTR_SPECIES][cache_key] = {}
+        # Here we try to ensure that we only run one API request for each species
+        # The first process creates an empty dict, and accesses the API
+        # Later requests for the same species either wait for the first one to complete
+        # or they return immediately if we already have the data we need
+        _LOGGER.debug("get_plant %s (include=%s)", species, sorted(requested_includes))
+        if species not in hass.data[DOMAIN][ATTR_SPECIES]:
+            _LOGGER.debug("I am the first process to get %s", species)
+            hass.data[DOMAIN][ATTR_SPECIES][species] = {}
             try:
+                # Pass requested extra categories straight through to the API. The
+                # SDK merges `lang` in and treats an empty dict as no extra params.
                 extra_params = {}
-                if include:
-                    extra_params["include"] = include
+                if requested_includes:
+                    extra_params["include"] = ",".join(sorted(requested_includes))
 
                 # Optionally pass Home Assistant language to OpenPlantbook API
                 send_lang = entry.options.get(FLOW_SEND_LANG, True)
@@ -228,6 +252,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 _LOGGER.warning(
                     "Rate limit reached while fetching data for %s", species
                 )
+                del hass.data[DOMAIN][ATTR_SPECIES][species]
                 raise exceptions.HomeAssistantError(
                     "OpenPlantbook API rate limit exceeded. Please try again later."
                 ) from err
@@ -237,23 +262,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "Authentication failed while fetching data for %s. Please reconfigure the integration",
                     species,
                 )
+                del hass.data[DOMAIN][ATTR_SPECIES][species]
                 raise InvalidAuth("Authentication failed") from err
             except MissingClientIdOrSecret:
                 plant_data = None
                 _LOGGER.error(
                     "Missing client ID or secret. Please set up the integration again"
                 )
+                del hass.data[DOMAIN][ATTR_SPECIES][species]
                 raise
             finally:
                 # Ensure the sentinel is removed if no data was stored
-                if hass.data[DOMAIN][ATTR_SPECIES].get(cache_key) == {}:
-                    del hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+                if hass.data[DOMAIN][ATTR_SPECIES].get(species) == {}:
+                    del hass.data[DOMAIN][ATTR_SPECIES][species]
 
             if plant_data:
                 _LOGGER.debug("Got data for %s", species)
                 _enrich_plant_data_with_dli(plant_data)
                 plant_data[OPB_ATTR_TIMESTAMP] = datetime.now().isoformat()
-                hass.data[DOMAIN][ATTR_SPECIES][cache_key] = plant_data
+                plant_data[OPB_ATTR_INCLUDES] = sorted(requested_includes)
+                hass.data[DOMAIN][ATTR_SPECIES][species] = plant_data
                 entity_base = plant_data[OPB_PID]
                 entity_id = async_generate_entity_id(
                     f"{DOMAIN}.{{}}", entity_base, current_ids={}
@@ -292,24 +320,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     entity_id, plant_data[OPB_DISPLAY_PID], plant_data
                 )
                 return plant_data
-            hass.data[DOMAIN][ATTR_SPECIES].pop(cache_key, None)
             return {}
-        elif OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][cache_key]:
+        elif OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][species]:
             # If more than one "get_plant" is triggered for the same species, we wait for up to
-            # 10 seconds for the first
-            # process to complete the API request.
+            # 10 seconds for the first process to complete the API request.
             # We don't want to return immediately, as we want the state object to be set by
-            # the running process before we return from this call
+            # the running process before we return from this call.
+            # Known limitation: if this request asked for extra `include`
+            # categories but the in-flight request did not, we return the
+            # in-flight (possibly base-only) result rather than refetching here.
+            # The next call for those categories will refetch, so this is a
+            # transient, self-correcting miss in the rare concurrent case.
             _LOGGER.debug(
                 "Another process is currently trying to get the data for %s",
                 species,
             )
 
             wait = 0
-            while (
-                cache_key not in hass.data[DOMAIN][ATTR_SPECIES]
-                or OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][cache_key]
-            ):
+            while OPB_PID not in hass.data[DOMAIN][ATTR_SPECIES][species]:
                 _LOGGER.debug("Waiting")
                 wait += 1
                 if wait == 10:
@@ -318,18 +346,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         "another request is still in progress, but timed out"
                     )
                 await asyncio.sleep(1)
-            if cache_key not in hass.data[DOMAIN][ATTR_SPECIES]:
-                return {}
             _LOGGER.debug("The other process completed successfully")
-            return hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            return hass.data[DOMAIN][ATTR_SPECIES][species]
         elif datetime.now() < datetime.fromisoformat(
-            hass.data[DOMAIN][ATTR_SPECIES][cache_key][OPB_ATTR_TIMESTAMP]
+            hass.data[DOMAIN][ATTR_SPECIES][species][OPB_ATTR_TIMESTAMP]
         ) + timedelta(hours=CACHE_TIME):
             # We already have the data we need, so let's just return
             _LOGGER.debug("We already have cached data for %s", species)
-            return hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            return hass.data[DOMAIN][ATTR_SPECIES][species]
         else:
-            del hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            del hass.data[DOMAIN][ATTR_SPECIES][species]
             raise OpenPlantbookException(
                 "an unknown error occurred while fetching data for species %s", species
             )
@@ -385,33 +411,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if hours is None or not isinstance(hours, int):
             hours = CACHE_TIME
         if ATTR_SPECIES in hass.data[DOMAIN]:
-            for cache_key in list(hass.data[DOMAIN][ATTR_SPECIES]):
-                value = hass.data[DOMAIN][ATTR_SPECIES][cache_key]
+            for species in list(hass.data[DOMAIN][ATTR_SPECIES]):
+                value = hass.data[DOMAIN][ATTR_SPECIES][species]
                 if OPB_ATTR_TIMESTAMP not in value:
                     continue
                 if datetime.now() > datetime.fromisoformat(
                     value[OPB_ATTR_TIMESTAMP]
                 ) + timedelta(hours=hours):
-                    _LOGGER.debug("Removing %s from cache", cache_key)
-                    entity_base = value[OPB_PID]
+                    _LOGGER.debug("Removing %s from cache", species)
                     entity_id = async_generate_entity_id(
-                        f"{DOMAIN}.{{}}", entity_base, current_ids={}
+                        f"{DOMAIN}.{{}}", value[OPB_PID], current_ids={}
                     )
-                    hass.data[DOMAIN][ATTR_SPECIES].pop(cache_key, None)
-                    # Only remove the HA entity if no other cache entry for
-                    # this PID still has valid (non-expired) data.
-                    pid_still_valid = any(
-                        other_key != cache_key
-                        and OPB_ATTR_TIMESTAMP in other_value
-                        and datetime.now()
-                        <= datetime.fromisoformat(other_value[OPB_ATTR_TIMESTAMP])
-                        + timedelta(hours=hours)
-                        for other_key, other_value in hass.data[DOMAIN][
-                            ATTR_SPECIES
-                        ].items()
-                    )
-                    if not pid_still_valid:
-                        hass.states.async_remove(entity_id)
+                    hass.data[DOMAIN][ATTR_SPECIES].pop(species, None)
+                    hass.states.async_remove(entity_id)
 
     def _write_file(path: str, data: bytes) -> None:
         """Write binary data to a file (runs in executor)."""
