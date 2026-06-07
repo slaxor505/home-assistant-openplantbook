@@ -4,24 +4,7 @@ Guidance for AI agents working in this repository. Keep this file in sync with `
 
 ---
 
-## 1. Repository rules (must follow)
-
-### Git
-- Read-only git is allowed: `git status`, `git diff`, `git log`.
-- Do **not** run state-changing git commands: `restore`, `reset`, `add`, `commit`, `stash`, `checkout`/`switch`, `merge`, `rebase`, `cherry-pick`, `tag`, `branch -d`.
-
-### Scope control
-- Implement only the exact requested change.
-- No drive-by refactors, reformatting, cleanups, dependency bumps, or adjacent fixes.
-- If you spot an out-of-scope bug: report it and request explicit approval before touching code. If approved, deliver it as a separate commit/PR.
-
-### Tests
-- Run all tests in **WSL only**, using the current PyCharm virtual environment.
-- Do not invent new test infrastructure unless asked.
-
----
-
-## 2. Project overview
+## 1. Project overview
 
 This is a custom Home Assistant integration that connects HA to [OpenPlantbook](https://open.plantbook.io/).
 
@@ -40,7 +23,7 @@ Key source files:
 
 ---
 
-## 3. Services exposed
+## 2. Services exposed
 
 | Service | Input | Effect |
 |---|---|---|
@@ -73,7 +56,7 @@ service_data:
 
 ---
 
-## 4. Safe-usage rules for agents
+## 3. Safe-usage rules for agents
 
 **Do**
 - Use the `search → pick exact pid → get` flow; never guess species names.
@@ -93,7 +76,7 @@ service_data:
 
 ---
 
-## 5. Setup checklist (when verifying an install)
+## 4. Setup checklist (when verifying an install)
 
 1. Integration enabled; domain `openplantbook` is configured.
 2. Credentials: `client_id` and `secret` from <https://open.plantbook.io/apikey/show/>; config flow validates and aborts on invalid input.
@@ -105,7 +88,7 @@ service_data:
 
 ---
 
-## 6. Quality-scale audit mode (optional task)
+## 5. Quality-scale audit mode (optional task)
 
 When asked to audit this integration against a Home Assistant quality-scale rule:
 
@@ -129,7 +112,7 @@ If the rule doc or required code is unreachable, state explicitly what's missing
 
 ---
 
-## 7. Privacy
+## 6. Privacy
 
 - Uploads are anonymized; location sharing is opt-in and must be explicit.
 - Never exfiltrate or persist `client_id`/`secret` outside HA.
@@ -137,7 +120,7 @@ If the rule doc or required code is unreachable, state explicitly what's missing
 
 ---
 
-## 8. Maintainers — keeping this file current
+## 7. Maintainers — keeping this file current
 
 When services, entities, or config options change:
 1. Update `services.yaml`, `manifest.json`, and `README.md`.
