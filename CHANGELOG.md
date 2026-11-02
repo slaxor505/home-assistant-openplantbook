@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.7.0.1] — 2026-11-02
+
+### Added (from upstream v1.7.0)
+
+- **Reauth and reconfigure flows**: when the API rejects the stored credentials, Home Assistant starts a re-authentication flow automatically. Credentials can also be changed from the entry's **Reconfigure** menu, without deleting the integration.
+- **Manifest category**: `garden_plants` integration category.
+- **Docs/tooling**: `CONTRIBUTING.md`, `docs/openplantbook-api-reference.md`, `.gitattributes` (LF line endings), native GitHub release notes config, CI testing against the newest HA and HA betas (incl. the official `pytest-home-assistant` package).
+
+### Changed (from upstream v1.7.0)
+
+- **DLI conversion**: OpenPlantbook mmol light values are daily integrals, so `max_dli`/`min_dli` are now `mmol × 0.001` (mol/m²/d), replacing the old ratio-based ×0.0036 logic. Converted values are clamped to 65 mol/m²/d with a warning.
+- **Plant device lookup**: the uploader finds plant devices through the Plant integration's config entries instead of scanning the device registry (`device_registry.devices` mapping access is deprecated in HA 2026.9). Other integrations' devices with "plant" in their identifiers are no longer matched.
+
+### Fork-only features kept
+
+- Upload-warning UI notifications (`notify_upload_warnings`), stale/missing sensor detection, extra conductivity unit variants, one-off info message, permission/rate-limit tests.
+- Fork tests now mock the new `_plant_devices` lookup instead of the device registry.
+
+### Upgrade notes
+
+- DLI attributes (`max_dli`, `min_dli`) will show different (corrected) values after upgrading. Review any automations that depend on them.
+
 ## [1.6.0.1] — 2026-06-27
 
 ### Added (from upstream v1.6.0)

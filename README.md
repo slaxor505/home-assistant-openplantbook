@@ -13,7 +13,7 @@ The goal of this fork is to stay aligned with Open Plantbook features, keep thin
 ## 📑 Table of Contents
 
 - [🌿 Founder-Edition of OpenPlantbook Integration for Home Assistant](#-founder-edition-of-openplantbook-integration-for-home-assistant)
-  - [🆕 What's New](#-whats-new-in-version-16)
+  - [🆕 What's New](#-whats-new-in-version-1701)
   - [📦 Installation](#-installation)
   - [🔧 Setup](#-setup)
   - [⚙️ Configuration Options](#️-configuration-options)
@@ -25,6 +25,17 @@ The goal of this fork is to stay aligned with Open Plantbook features, keep thin
   - [📡 Actions (Service Calls)](#-actions-service-calls)
 
 ---
+
+## 🆕 What's New in version 1.7.0.1
+
+Synced from [upstream v1.7.0](https://github.com/Olen/home-assistant-openplantbook/releases/tag/v1.7.0):
+
+- **Update credentials without re-adding** — if your API credentials stop working, Home Assistant now asks you to re-authenticate. You can also change them any time via the integration's **⋮ → Reconfigure** menu.
+- **Corrected DLI values** — `max_dli` / `min_dli` are now calculated as a plain mmol → mol conversion (mol/m²/d) and capped at 65 (the physical maximum). Your plant DLI thresholds may change after upgrading.
+- **Future-proof plant device lookup** — sensor-data upload finds plants via the Plant integration's config entries (needed for Home Assistant 2026.9+). Devices from other integrations whose names merely contain "plant" are no longer picked up.
+
+> [!NOTE]
+> All fork-only features (sensor monitoring notifications, extra conductivity units, etc.) are kept. See the [CHANGELOG](./CHANGELOG.md) for details.
 
 ## 🆕 What's New in version 1.6.0.1
 
@@ -84,6 +95,8 @@ You need an OpenPlantbook account (free) with API credentials.
 3. In Home Assistant: **Settings** → **Devices & Services** → **Add Integration** → **OpenPlantbook**
 4. Enter your credentials — the integration validates them and shows an error if incorrect
 5. Configure upload settings (optional but recommended)
+
+To change your credentials later, use **⋮ → Reconfigure** on the integration card. If the credentials become invalid, Home Assistant will prompt you to re-authenticate.
 
 ---
 

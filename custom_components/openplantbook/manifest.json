@@ -1,6 +1,9 @@
 {
   "domain": "openplantbook",
   "name": "OpenPlantbook",
+  "categories": [
+    "garden_plants"
+  ],
   "codeowners": [
     "@slaxor505"
   ],
@@ -20,6 +23,5 @@
     "openplantbook-sdk==0.6.1"
   ],
   "single_config_entry": true,
-  "version": "1.6.0.1-beta1"
+  "version": "1.7.0.1-beta1"
 }
-

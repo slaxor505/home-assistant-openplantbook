@@ -137,3 +137,6 @@ uv.lock
 
 # Local planning / agent artifacts
 /docs/superpowers/
+
+# Written by Home Assistant when pytest-home-assistant runs the tests
+tests/testing_config/

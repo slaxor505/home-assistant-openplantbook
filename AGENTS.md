@@ -79,7 +79,7 @@ service_data:
 ## 4. Setup checklist (when verifying an install)
 
 1. Integration enabled; domain `openplantbook` is configured.
-2. Credentials: `client_id` and `secret` from <https://open.plantbook.io/apikey/show/>; config flow validates and aborts on invalid input.
+2. Credentials: `client_id` and `secret` from <https://open.plantbook.io/apikey/show/>; config flow validates and aborts on invalid input. Credentials can be changed via the entry's **Reconfigure** flow; an auth failure during `get`/`search` starts a **reauth** flow automatically.
 3. Optional options:
    - Upload sensor data — requires the sister "Home Assistant Plant" integration.
    - Location sharing (country/coordinates) — only with explicit user consent.

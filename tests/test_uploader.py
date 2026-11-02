@@ -12,15 +12,21 @@ from homeassistant.const import (
     UnitOfConductivity,
     UnitOfTemperature,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt
 from openplantbook_sdk.sdk import RateLimitError
 
 import custom_components.openplantbook.uploader as uploader
 from custom_components.openplantbook.const import ATTR_API, DOMAIN, FLOW_NOTIFY_WARNINGS
 from custom_components.openplantbook.uploader import (
+    PLANT_DOMAIN,
+    _plant_devices,
     get_supported_state_value,
     plant_data_upload,
 )
+
+from .ha_common import MockConfigEntry
 
 
 class TestGetSupportedStateValue:
@@ -409,6 +415,41 @@ class TestGetSupportedStateValue:
         assert error is None
 
 
+async def test_plant_devices_selects_plant_integration_devices(
+    hass: HomeAssistant,
+) -> None:
+    """Only the plant integration's own, non-renamed devices are uploaded."""
+    device_reg = dr.async_get(hass)
+
+    plant_entry = MockConfigEntry(domain=PLANT_DOMAIN)
+    plant_entry.add_to_hass(hass)
+    plant = device_reg.async_get_or_create(
+        config_entry_id=plant_entry.entry_id,
+        identifiers={(PLANT_DOMAIN, plant_entry.entry_id)},
+        name="Monstera",
+    )
+
+    renamed_entry = MockConfigEntry(domain=PLANT_DOMAIN)
+    renamed_entry.add_to_hass(hass)
+    renamed = device_reg.async_get_or_create(
+        config_entry_id=renamed_entry.entry_id,
+        identifiers={(PLANT_DOMAIN, renamed_entry.entry_id)},
+        name="Basil",
+    )
+    device_reg.async_update_device(renamed.id, name_by_user="Kitchen basil")
+
+    # Another integration's device whose identifiers merely contain "plant"
+    other_entry = MockConfigEntry(domain="esphome")
+    other_entry.add_to_hass(hass)
+    device_reg.async_get_or_create(
+        config_entry_id=other_entry.entry_id,
+        identifiers={("esphome", "plant-monitor")},
+        name="Plant monitor",
+    )
+
+    assert [d.id for d in _plant_devices(hass)] == [plant.id]
+
+
 @pytest.mark.asyncio
 async def test_async_setup_upload_schedule_random_time():
     hass = Mock()
@@ -491,7 +532,7 @@ async def test_async_setup_upload_schedule_rate_limit_skips_cycle(caplog):
 async def test_plant_data_upload_warning_old_data(
     hass,
     init_integration,
-    mock_device_registry,
+    mock_plant_devices,
     mock_entity_registry,
     mock_recorder_dependency,
     mock_plant_device,
@@ -500,7 +541,7 @@ async def test_plant_data_upload_warning_old_data(
     caplog.set_level(logging.DEBUG)
 
     device, plant_entity_entry = mock_plant_device
-    mock_device_registry.devices.data = {device.id: device}
+    mock_plant_devices.return_value = [device]
 
     with patch(
         "custom_components.openplantbook.uploader.entity_registry.async_entries_for_device",
@@ -535,7 +576,7 @@ async def test_plant_data_upload_warning_old_data(
 async def test_plant_data_upload_warning_never_uploaded_sunday(
     hass,
     init_integration,
-    mock_device_registry,
+    mock_plant_devices,
     mock_entity_registry,
     mock_recorder_dependency,
     mock_plant_device,
@@ -544,7 +585,7 @@ async def test_plant_data_upload_warning_never_uploaded_sunday(
     caplog.set_level(logging.DEBUG)
 
     device, plant_entity_entry = mock_plant_device
-    mock_device_registry.devices.data = {device.id: device}
+    mock_plant_devices.return_value = [device]
 
     with patch(
         "custom_components.openplantbook.uploader.entity_registry.async_entries_for_device",
@@ -576,7 +617,7 @@ async def test_plant_data_upload_warning_never_uploaded_sunday(
 async def test_plant_data_upload_registration_none_response_logs_error(
     hass,
     init_integration,
-    mock_device_registry,
+    mock_plant_devices,
     mock_entity_registry,
     mock_recorder_dependency,
     mock_plant_device,
@@ -585,7 +626,7 @@ async def test_plant_data_upload_registration_none_response_logs_error(
     caplog.set_level(logging.DEBUG)
 
     device, plant_entity_entry = mock_plant_device
-    mock_device_registry.devices.data = {device.id: device}
+    mock_plant_devices.return_value = [device]
 
     with patch(
         "custom_components.openplantbook.uploader.entity_registry.async_entries_for_device",

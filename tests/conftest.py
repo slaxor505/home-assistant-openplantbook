@@ -9,18 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from homeassistant.const import CONF_CLIENT_ID, CONF_CLIENT_SECRET
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.openplantbook.const import ATTR_API, DOMAIN
 
-# This fixture ensures our custom component is loaded
-pytest_plugins = "pytest_homeassistant_custom_component"
+from .ha_common import OFFICIAL_TEST_PACKAGE, MockConfigEntry
 
+if not OFFICIAL_TEST_PACKAGE:
+    # The official package's plugin loads itself and enables custom integrations
+    pytest_plugins = "pytest_homeassistant_custom_component"
 
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Enable custom integrations for all tests."""
-    yield
+    @pytest.fixture(autouse=True)
+    def auto_enable_custom_integrations(enable_custom_integrations):
+        """Enable custom integrations for all tests."""
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -51,14 +52,13 @@ def mock_recorder_dependency(hass: HomeAssistant) -> Generator[MagicMock, None, 
 
 
 @pytest.fixture
-def mock_device_registry() -> Generator[MagicMock, None, None]:
-    """Mock device registry for uploader tests."""
-    mock_registry = MagicMock()
+def mock_plant_devices() -> Generator[MagicMock, None, None]:
+    """Mock the uploader's plant-device lookup (set ``return_value`` to a device list)."""
     with patch(
-        "custom_components.openplantbook.uploader.device_registry.async_get",
-        return_value=mock_registry,
-    ):
-        yield mock_registry
+        "custom_components.openplantbook.uploader._plant_devices",
+        return_value=[],
+    ) as mock_lookup:
+        yield mock_lookup
 
 
 @pytest.fixture
@@ -109,16 +109,14 @@ def mock_upload_env(mock_hass_with_api, mock_plant_device):
     hass, api_mock = mock_hass_with_api
     device, plant_entity_entry = mock_plant_device
 
-    device_reg = Mock()
-    device_reg.devices.data = {device.id: device}
     entity_reg = Mock()
     recorder = Mock()
     recorder.async_add_executor_job = AsyncMock(return_value={})
 
     with (
         patch(
-            "custom_components.openplantbook.uploader.device_registry.async_get",
-            return_value=device_reg,
+            "custom_components.openplantbook.uploader._plant_devices",
+            return_value=[device],
         ),
         patch(
             "custom_components.openplantbook.uploader.entity_registry.async_get",
@@ -134,7 +132,6 @@ def mock_upload_env(mock_hass_with_api, mock_plant_device):
             api_mock=api_mock,
             device=device,
             plant_entity_entry=plant_entity_entry,
-            device_reg=device_reg,
             entity_reg=entity_reg,
             recorder=recorder,
         )
