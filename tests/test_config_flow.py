@@ -9,7 +9,6 @@ from homeassistant.const import CONF_CLIENT_ID, CONF_CLIENT_SECRET
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from openplantbook_sdk import MissingClientIdOrSecret
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.openplantbook.const import (
     DEFAULT_IMAGE_PATH,
@@ -20,6 +19,8 @@ from custom_components.openplantbook.const import (
     FLOW_UPLOAD_HASS_LOCATION_COORD,
     FLOW_UPLOAD_HASS_LOCATION_COUNTRY,
 )
+
+from .ha_common import MockConfigEntry
 
 
 class TestConfigFlow:
@@ -223,6 +224,148 @@ class TestConfigFlow:
 
         assert result["type"] == FlowResultType.ABORT
         assert result["reason"] == "single_instance_allowed"
+
+
+class TestReauthFlow:
+    """Tests for the reauthentication flow."""
+
+    async def test_reauth_flow_success(
+        self,
+        hass: HomeAssistant,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """New valid credentials update the existing entry and abort successfully."""
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={CONF_CLIENT_ID: "old_id", CONF_CLIENT_SECRET: "old_secret"},
+            unique_id="old_id",
+        )
+        entry.add_to_hass(hass)
+
+        with patch(
+            "custom_components.openplantbook.config_flow.OpenPlantBookApi"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api._async_get_token = AsyncMock(return_value="test_token")
+            mock_api_class.return_value = mock_api
+
+            result = await entry.start_reauth_flow(hass)
+            assert result["type"] == FlowResultType.FORM
+            assert result["step_id"] == "reauth_confirm"
+
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                {CONF_CLIENT_ID: "new_id", CONF_CLIENT_SECRET: "new_secret"},
+            )
+            await hass.async_block_till_done()
+
+        assert result["type"] == FlowResultType.ABORT
+        assert result["reason"] == "reauth_successful"
+        assert entry.data[CONF_CLIENT_ID] == "new_id"
+        assert entry.data[CONF_CLIENT_SECRET] == "new_secret"
+        assert entry.unique_id == "new_id"
+
+    async def test_reauth_flow_invalid_auth(
+        self,
+        hass: HomeAssistant,
+    ) -> None:
+        """Invalid credentials re-show the reauth form with an error."""
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={CONF_CLIENT_ID: "old_id", CONF_CLIENT_SECRET: "old_secret"},
+            unique_id="old_id",
+        )
+        entry.add_to_hass(hass)
+
+        with patch(
+            "custom_components.openplantbook.config_flow.OpenPlantBookApi"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api._async_get_token = AsyncMock(
+                side_effect=MissingClientIdOrSecret("Invalid credentials")
+            )
+            mock_api_class.return_value = mock_api
+
+            result = await entry.start_reauth_flow(hass)
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                {CONF_CLIENT_ID: "bad_id", CONF_CLIENT_SECRET: "bad_secret"},
+            )
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
+        assert result["errors"] == {CONF_CLIENT_ID: "invalid_auth"}
+
+
+class TestReconfigureFlow:
+    """Tests for the reconfigure flow."""
+
+    async def test_reconfigure_flow_success(
+        self,
+        hass: HomeAssistant,
+        mock_openplantbook_api: MagicMock,
+    ) -> None:
+        """New valid credentials update the existing entry and abort successfully."""
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={CONF_CLIENT_ID: "old_id", CONF_CLIENT_SECRET: "old_secret"},
+            unique_id="old_id",
+        )
+        entry.add_to_hass(hass)
+
+        with patch(
+            "custom_components.openplantbook.config_flow.OpenPlantBookApi"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api._async_get_token = AsyncMock(return_value="test_token")
+            mock_api_class.return_value = mock_api
+
+            result = await entry.start_reconfigure_flow(hass)
+            assert result["type"] == FlowResultType.FORM
+            assert result["step_id"] == "reconfigure"
+
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                {CONF_CLIENT_ID: "new_id", CONF_CLIENT_SECRET: "new_secret"},
+            )
+            await hass.async_block_till_done()
+
+        assert result["type"] == FlowResultType.ABORT
+        assert result["reason"] == "reconfigure_successful"
+        assert entry.data[CONF_CLIENT_ID] == "new_id"
+        assert entry.data[CONF_CLIENT_SECRET] == "new_secret"
+        assert entry.unique_id == "new_id"
+
+    async def test_reconfigure_flow_invalid_auth(
+        self,
+        hass: HomeAssistant,
+    ) -> None:
+        """Invalid credentials re-show the reconfigure form with an error."""
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={CONF_CLIENT_ID: "old_id", CONF_CLIENT_SECRET: "old_secret"},
+            unique_id="old_id",
+        )
+        entry.add_to_hass(hass)
+
+        with patch(
+            "custom_components.openplantbook.config_flow.OpenPlantBookApi"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api._async_get_token = AsyncMock(
+                side_effect=ConnectionError("Cannot connect")
+            )
+            mock_api_class.return_value = mock_api
+
+            result = await entry.start_reconfigure_flow(hass)
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                {CONF_CLIENT_ID: "bad_id", CONF_CLIENT_SECRET: "bad_secret"},
+            )
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+        assert result["errors"] == {"base": "cannot_connect"}
 
 
 class TestOptionsFlow:

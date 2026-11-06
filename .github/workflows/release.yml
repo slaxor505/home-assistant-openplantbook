@@ -14,8 +14,11 @@ jobs:
   auto-release:
     name: "Auto Release"
     runs-on: "ubuntu-latest"
-    # Only run if CI succeeded
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only after CI succeeds on a push to this repository (a fork's branch can also be named main)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v7
@@ -55,15 +58,6 @@ jobs:
         run: echo "Skipping release - manifest unchanged or tag already exists"
         if: steps.check_manifest.outputs.changed != 'true' || steps.check_tag.outputs.exists == 'true'
 
-      - name: "Get previous release version"
-        id: last_release
-        run: |
-          LAST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
-          echo "tag_name=${LAST_TAG}" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: steps.check_manifest.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true'
-
       - name: "Create new tag"
         uses: rickstaa/action-create-tag@v1
         id: "tag_create"
@@ -73,22 +67,14 @@ jobs:
           message: "Version ${{ env.COMPONENT_VERSION }}"
         if: steps.check_manifest.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true'
 
-      - name: "Generate release changelog"
-        id: changelog
-        uses: heinrichreimer/github-changelog-generator-action@v2.4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          sinceTag: ${{ steps.last_release.outputs.tag_name }}
-          headerLabel: "# Notable changes since ${{ steps.last_release.outputs.tag_name }}"
-          stripGeneratorNotice: true
-          output: RELEASE_CHANGELOG.md
-        if: steps.check_manifest.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true'
-
+      # GitHub's native release notes: auto-detects the previous tag (so a beta's
+      # notes don't span back to the last stable) and buckets PRs by label per
+      # .github/release.yml. Replaces the raw changelog-generator dump.
       - name: "Create Stable release"
         uses: softprops/action-gh-release@v3
         with:
           prerelease: false
-          body_path: RELEASE_CHANGELOG.md
+          generate_release_notes: true
           name: "Version ${{ env.COMPONENT_VERSION }}"
           tag_name: "v${{ env.COMPONENT_VERSION }}"
         if: steps.check_manifest.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true' && contains(env.COMPONENT_VERSION, 'beta') == false
@@ -97,7 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           prerelease: true
-          body_path: RELEASE_CHANGELOG.md
+          generate_release_notes: true
           name: "Version ${{ env.COMPONENT_VERSION }}"
           tag_name: "v${{ env.COMPONENT_VERSION }}"
         if: steps.check_manifest.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true' && contains(env.COMPONENT_VERSION, 'beta') == true
