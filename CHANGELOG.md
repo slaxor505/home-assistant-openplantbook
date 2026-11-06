@@ -8,10 +8,9 @@
 
 ### Changed
 
-- Synced with upstream main through `812a2d3`, including v1.7.1 and subsequent CI and installation-documentation updates.
+- Synced with upstream main through `812a2d3`, including v1.7.1 and subsequent CI updates.
 - Upstream CI now installs the matching official `pytest-homeassistant` package from PyPI. Fork tests use the shared compatibility helper for both supported test packages.
 - Release automation only publishes after successful CI on a push to this repository.
-- Installation instructions identify this fork as a custom Marketplace/HACS repository because the default catalog now points to upstream.
 - Preserved the fork's upload warnings, sensor monitoring, conductivity-unit support, and repository identity. The integration version is `1.7.1.1-beta1` while awaiting release validation.
 
 ## [1.7.0.1] — 2026-11-02

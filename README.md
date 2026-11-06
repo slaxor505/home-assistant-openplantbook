@@ -68,21 +68,19 @@ Synced through [upstream v1.7.1](https://github.com/Olen/home-assistant-openplan
 
 ## 📦 Installation
 
-### Via the Marketplace *(recommended)*
+### Via HACS *(recommended)*
 
-The default catalog now points to [upstream OpenPlantbook](https://github.com/Olen/home-assistant-openplantbook). To install this Founder Edition, add `https://github.com/slaxor505/home-assistant-openplantbook` as a **custom repository**, with category **Integration**, in the Marketplace (HACS before Home Assistant 2026.11).
+This integration is available in the **default HACS store** — no custom repository needed.
 
-[![Open this fork in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=slaxor505&repository=home-assistant-openplantbook&category=integration)
+1. Open **HACS** in Home Assistant
+2. Search for **OpenPlantbook** and open its card
+3. Click **Download**
+4. Restart Home Assistant
 
-1. Open the Marketplace or HACS and add the custom repository above if needed.
-2. Open the OpenPlantbook repository card and verify its owner is **slaxor505**.
-3. Click **Install** (**Download** in HACS), then restart Home Assistant.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=slaxor505&repository=home-assistant-openplantbook&category=integration)
 
 > [!TIP]
-> To install a pre-release (e.g. a `-beta` version), enable **Show beta versions** in the repository card before downloading.
-
-> [!NOTE]
-> Both this fork and upstream use the domain `openplantbook`; install one version at a time. You can continue using this fork to keep its sensor-monitoring notifications and other extra features.
+> To install a pre-release (e.g. a `-beta` version), open the OpenPlantbook card in HACS, click the three-dot menu, and enable **Show beta versions** before downloading.
 
 ### Manual Installation
 
