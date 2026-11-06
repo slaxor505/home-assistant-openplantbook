@@ -10,7 +10,7 @@ This is a custom Home Assistant integration that connects HA to [OpenPlantbook](
 
 - Integration path in this repo: `custom_components/openplantbook/`
 - Domain: `openplantbook`
-- Distributed via HACS (recommended) or manual copy to `<config>/custom_components/openplantbook/`
+- Distributed via a custom repository in the Marketplace/HACS (recommended) or manual copy to `<config>/custom_components/openplantbook/`; the default catalog points to upstream, so select owner `slaxor505` for this fork.
 - Declares HA dependencies on `history` and `recorder` (do not disable)
 
 Key source files:
